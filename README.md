@@ -3,9 +3,9 @@ Sitecore Ignition Documentation
 
 Usage and API documentation for Sitecore Ignition framework.
 
-[![Documentation Status](https://readthedocs.org/projects/sitecoreignition/badge/?version=latest)](https://readthedocs.org/projects/sitecoreignition/?badge=latest)
+[![Documentation Status](https://readthedocs.org/projects/sitecoreignition/badge/?version=master)](https://readthedocs.org/projects/sitecoreignition/?badge=master)
 
-[Visit the Sitecore Ignition Documentation here!](http://sitecoreignition.readthedocs.io/en/latest/)
+[Visit the Sitecore Ignition Documentation here!](http://sitecoreignition.readthedocs.io/en/master/)
 
 Contribute
 ----------
