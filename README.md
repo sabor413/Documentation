@@ -13,7 +13,7 @@ We are happily accepting pull requests for documentation!
 ### Setup the Project
 1. Clone the repository: `git clone https://github.com/sitecoreignition/Documentation.git`.
 2. Download the latest version of [Python for Windows](https://www.python.org/downloads/windows/).
-    - Make sure you check `Add Python 3.5 to PATH` on the first screen of the installer.
+    - Make sure you check `Add Python 3.X to PATH` on the first screen of the installer.
 3. Open an elevated command prompt.
 4. Install Sphinx with this command: `pip install sphinx`.
 5. Install the Sphinx Read the Docs theme with this command: `pip install sphinx_rtd_theme`.
