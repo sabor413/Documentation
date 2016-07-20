@@ -2,7 +2,7 @@
 Setup
 *****
 
-Information regarding setting up the Ignition framework is provided through the README file associated with the Sitecore Ignition GITHub repository accessible through `this link`_.
+Information regarding setting up the Ignition framework is provided through the README file associated with the Sitecore Ignition GitHub repository accessible through `this link`_.
 
 .. _this link: https://github.com/sitecoreignition/SitecoreIgnition/
 
