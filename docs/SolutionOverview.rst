@@ -169,6 +169,197 @@ Ensuring the View Supports the Experience Editor
 Creating an Experience Editor View
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+.. _Calling-the-View-Method:
+
+Caliing the View Method
+^^^^^^^^^^^^^^^^^^^^^^^
+The Ignition framework contains an overridden version of the View() method which is used to not only call the view file which is to be rendered but also has a variety of options to support sophisticated logic associated with rendering the view.  The View() method full signature is defined as follows in Ignition.
+
+return View<TAgent, TViewModel, TParams>(object agentParameters);
+
+The View() method signature can be called in the following way which the blog below will discuss in detail.
+
+1. View<TViewModel>()
+2. View<TAgent, TViewModel>()
+3. View<TAgent, TViewModel, TParams>()
+4. View<TAgent, TViewModel>(agentParameters)
+
+**View <TViewModel>() override**
+
+The most basic View method call will only involve the view model used to render the view.  Every view method call will include the view model.  If the view model inherits Ignition’s defined fields, so no additional view model properties need defining, then the model can be passed alone.  This also assumes that the view in question needs only the base defined fields which Ignition provides out of the box.  As an example, let’s say there is a content blurb component which is utilizing an item that is inheriting the base Ignition fields provided by the framework (i.e. IHeading, ISubtitile, IRichContent1).  The model for this view is defined below. ::
+
+    using Ignition.Core.Mvc;
+    using Ignition.Data.Fields;
+
+    namespace Ignition.Sc.Components.Content
+    {
+        public class ContentBlurbViewModelOnly : BaseViewModel
+        {
+            public IHeading Heading { get; set; }
+            public ISubtitle Subtitle { get; set; }
+            public IRichContent1 RichText1 { get; set; }
+        }
+    }
+
+IHeading, ISubtitle and IRichContent1 are base fields defined in the Ignition.Data.Fields namespace.  Therefore, as long as the item used as a datasource for this component inherits Ignition’s Heading, Subtitle and RichContent1 templates, there will not be a need for an agent to populate the model with the content of the datasource.  An image of the Content Blurb template is shown below to show that this template inherits the Heading, Subtitle and RichContent1 templates which are base field templates in Ignition.
+
+.. image:: images/ContentBlurbTemplate.jpg
+    :scale: 35
+    :align: center
+
+This simplifies the controller view call (ContentBlurbViewModelOnly) in the following manner. ::
+
+    using System.Web.Mvc;
+    using Ignition.Core.Mvc;
+    using Ignition.Core.Repositories;
+
+    namespace Ignition.Sc.Components.Content
+    {
+        public class ContentController : IgnitionController
+        {
+            public ActionResult ContentBlurbViewModelOnly()
+            {
+                return View<ContentBlurbViewModelOnly>();
+            }  
+        }
+    }
+
+This call only requires the model used to map the item used as a datasource against the component which will call this controller’s ActionResult.  In this example, the view is named ContentBlurbViewModelOnly.cshtml and resides in the same Component/Content folder as the ContentController.cs file itself.
+
+**View<TAgent, TViewModel>() override**
+
+The next version of the View method call will involve the agent.  The view agent is designed to provide a mechanism to complete population of the view model to properly support the rendered view.  This can prove very useful with a Sitecore site since many different items and Sitecore mechanisms can be involved with rendering a view.  This logic is coded within a view agent’s PopulateModel method which is a required method of the Agent class.  When inherited, the Agent class accepts the view model class which is used for the view.  Let’s see how the View method controller call changes when an agent is involved.  In this example, the name of the component is ContentBlurbListView.  We are using an agent named ContentBlurbListViewAgent to assist with populating the ContentBlurbListViewModel view model. ::
+
+    using System.Web.Mvc;
+    using Ignition.Core.Mvc;
+    using Ignition.Core.Repositories;
+
+    namespace Ignition.Sc.Components.Content
+    {
+        public class ContentController : IgnitionController
+        {
+            public ActionResult ContentBlurbListView()
+            {
+                return View<ContentBlurbListViewAgent, ContentBlurbListViewModel>();
+            }  
+        }
+    }
+
+The agent code is shown below.  The agent inherits the Agent class which accepts the view model class which is the same one passed through the controller call.  Each agent has a PopulateModel method which must be invoked as part of coding the agent. ::
+
+    using Ignition.Core.Mvc;
+
+    namespace Ignition.Sc.Components.Content
+    {
+        public class ContentBlurbListViewAgent : Agent<ContentBlurbListViewModel>
+        {
+            public override void PopulateModel()
+            {
+                ViewModel.ViewPath = IgnitionConstants.ContentViews.ContentBlurbListView;
+            }
+        }
+    }
+
+It is through this method, that the view model can be updated along with any logic needed to complete the view model passed to the view for rendering.  The ViewModel object is cast to the view model class that is referenced in the Agent class inheritance of the agent class.  In addition to having access to the properties of the view model class, the ViewModel object has access to other properties which supports rendering the view.  For instance, in the example shown, the view path of the view being rendered can be set dynamically using code like the one shown.  This option is helpful if the view is not located in the same location as the controller which ultimately calls it.  There will be other examples in this blog of how the agent’s PopulateModel method can update the view model object based on data it has access to.
+
+**View<TAgent, TViewModel, TParams>() override**
+
+The next version of the View method call will involve passing in rendering parameters.  Sitecore’s mechanism for rendering a component involves the ability to create and use rendering parameters to provide content authors behavioral options for rendering a component.  Using the Ignition framework, the developer would create an interface mechanism which represents in code, the rendering parameter template which would be associated with the component in Sitecore to provide those rendering options.  An example of such an interface is provided below for a ContentBlurb parameter rendering template which supports the ContentBlurb component in Sitecore. ::
+
+    using Glass.Mapper.Sc.Configuration.Attributes;
+    using Ignition.Core.Models.BaseModels;
+    using Ignition.Core.Models.Settings;
+
+    namespace Ignition.Sc.Components.Content
+    {
+        [SitecoreType(TemplateId = "{B85DA308-D24B-4CFC-A6BF-B7DE4C4F1B4F}", AutoMap = true)]
+        public interface IContentBlurbParams : IParamsBase
+        {
+            IStringSetting Position { get; set; }
+        }
+    }
+
+Once the interface is created, that interface referenced would be passed to the View method call to make it accessible to the view agent which will use coding logic in its PopulateModel method to access the rendering parameters available in the component. ::
+
+    using System.Web.Mvc;
+    using Ignition.Core.Mvc;
+    using Ignition.Core.Repositories;
+
+    namespace Ignition.Sc.Components.Content
+    {
+        public class ContentController : IgnitionController
+        {
+            public ActionResult ContentBlurbView()
+            {
+                return View<ContentBlurbAgent, ContentBlurbViewModel, IContentBlurbParams>();
+            }
+        }
+    }
+
+The agent example code is shown below. ::
+
+    using Ignition.Core.Mvc;
+
+    namespace Ignition.Sc.Components.Content
+    {
+        public class ContentBlurbAgent : Agent<ContentBlurbViewModel>
+        {
+            public override void PopulateModel()
+            {
+                var parameters = RenderingParameters as IContentBlurbParams;
+            
+                if (parameters == null) return;
+                ViewModel.HeadingPosition = parameters.Position?.StringSetting;
+            }
+        }
+    }
+
+The PopulateModel method of the agent has access to the RenderingParameters object.  This object has access to the rendering parameter data stored in the component through the use of the rendering parameter template.  This object can be cast back to the interface which represents the rendering parameter template and can then be used to access this content when set through the component.  This content can be used by the agent to set the data which can be used by the view to influence the component’s behavior which will be ultimately driven by content authors.
+
+**View<TAgent, TViewModel>(object agentParameters) override**
+
+To assist with developing sophisticated logic when properly developing the view model in code, agent parameters can be defined and passed through the View method to the view agent’s PopulateModel method.  The process starts by creating an agent parameter class used to contain the data which then serves as a parameter of the View method. ::
+
+    namespace Ignition.Sc.Components.Content
+    {
+        public class ContentBlurbParams
+        {
+            public string Params1 { get; set; }
+            public string Params2 { get; set; }
+            public string Params3 { get; set; }
+        }
+    }
+
+Once created, the agent parameter object is instantiated and then passed to the View method.  An example of this process is shown below.  Note, the new ContentBlurbParams object passed as a parameter to the View method call. ::
+
+    public ActionResult ContentBlurbView()
+    {
+        return View<ContentBlurbAgent, ContentBlurbViewModel>(new ContentBlurbParams
+        {
+       	    Params1 = "First Parameter",
+            Params2 = "Second Parameter",
+            Params3 = "Third Parameter"
+        });
+    }
+
+Within the agent’s PopulateModel method, these agent parameters can be accessed using the *AgentParameters* object which can be cast to the agent parameter class used to create the object in the View method call to make accessing of the agent parameters properties much easier.  An example of this coding is shown below. ::
+
+    using Ignition.Core.Mvc;
+
+    namespace Ignition.Sc.Components.Content
+    {
+        public class ContentBlurbAgent : Agent<ContentBlurbViewModel>
+        {
+            public override void PopulateModel()
+            {
+                var agentParameters = AgentParameters as ContentBlurbParams;
+
+                if (agentParameters == null) return;
+                ViewModel.AgentParam = agentParameters.Params1;
+            }
+        }
+    }
+
 .. _Creating-Agent-for-Component:
 
 Creating an Agent for a Component
