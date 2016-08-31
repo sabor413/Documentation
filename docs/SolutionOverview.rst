@@ -102,6 +102,243 @@ Using the ViewPath Property
 Creating a Custom ViewModel
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Sometimes, a component in Sitecore requires access to a variety of items in the content tree.  In this example, a component is created in Sitecore where the item structure was three tiered meaning that the component’s datasource, its children and grandchildren from its structure in the content tree would have to be accessed to properly populate the component.  An example of this structure is shown below where the component’s datasource is the top *Contact Location List* item.  The component in question would also access the list’s country items which are its immediate children and the list’s grandchildren which are defined as city entries which exist within the country entries.
+
+.. image:: images/ThreeTieredContentStructure.jpg
+    :scale: 15
+    :align: center
+
+Using the *Ignition framework*, The Location List, Location Country and the Location City were defined in the following way.  Note that the List interface defines a collection of List country interfaces and the List country interface defines a collection of List Cities and List Cities capture city information though in this case we are only interested in capturing link information to a city page. ::
+
+    using System.Collections.Generic;
+    using Common.Core.Models.Fields;
+    using Glass.Mapper.Sc.Configuration;
+    using Glass.Mapper.Sc.Configuration.Attributes;
+
+    namespace Ignition.Sc.Components.Location.Models
+    {
+        [SitecoreType(TemplateId = "{A601C4D5-1BF3-4167-9B44-975179E292D4}", AutoMap = true)]
+        public interface ILocationList : IHeading
+        {
+            [SitecoreField(Setting = SitecoreFieldSettings.InferType)]
+            IEnumerable<ILocationListCountry> PrimaryCountryLink { get; set; }
+
+            [SitecoreField(Setting = SitecoreFieldSettings.InferType)]
+            IEnumerable<ILocationListCountry> SecondaryCountryLinks { get; set; }
+        }
+    }
+
+    using System.Collections.Generic;
+    using Common.Core.Models.Fields;
+    using Glass.Mapper.Sc.Configuration;
+    using Glass.Mapper.Sc.Configuration.Attributes;
+
+    namespace Ignition.Sc.Components.Location.Models
+    {
+        [SitecoreType(TemplateId = "{DCB4BB53-3B09-4F89-BFEA-9159315212D1}", AutoMap = true)]
+        public interface ILocationListCountry : IHeading
+        {
+            [SitecoreField(Setting = SitecoreFieldSettings.InferType)]
+            IEnumerable<ILocationCity> Cities { get; set; } 
+        }
+    }
+
+    using Common.Core.Models.Fields;
+    using Glass.Mapper.Sc.Configuration.Attributes;
+
+    namespace Ignition.Sc.Components.Location.Models
+    {
+        [SitecoreType(TemplateId = "{B86E6717-B728-460F-B013-080B52BD1413}", AutoMap = true)]
+        public interface ILocationCity : IPrimaryLink
+        {
+        }
+    }
+
+When the view model was created for this component’s MVC view, A direct reference to the interface was used to capture information about List Country information as shown below… ::
+
+    using System.Collections.Generic;
+    using Common.Core.Models.Fields;
+    using Common.Core.MVC;
+    using Common.Core.Utils;
+    using Ignition.Sc.Components.Location.Models;
+
+    namespace Ignition.Sc.Components.Location.ViewModels
+    {
+        public class LocationListViewModel : BaseViewModel
+        {
+            public LocationListViewModel(IRepository repository) : base(repository)
+            {
+            }
+            public IHeading Heading { get; set; }
+       
+            public ILocationListCountry PrimaryCountryModel { get; set; }
+            public IEnumerable<ILocationListCountry> SecondaryCountriesModel { get; set; }
+        
+            public ILocationList EditFrameItem { get; set; }
+
+            public override string ViewPath { get; set; } = Constants.Location.LocationList;
+        }
+    }
+
+However, a proxy related error occurred when attempting to using this view model containing a direct reference to the *ILocationListCountry* interface.
+
+The **PopulateModel** method used by the **Agent** interface called by the MVC controller action to access the view, performs a *mapping* between the assigned view model (passed as a parameter to the Agent interface) and the interface used to cast the component’s datasource.
+
+It is typical using the Ignition Framework that the datasource passed to the component through Sitecore is mapped in code to an interface so the fields which make up the datasource item is automatically mapped to properties of that interface.  The interface (ILocationList) has properties representing the collection of countries (ILocationListCountry) so it made sense that the view model should have a similar property for the collection of countries so that Populate method would simply transfer the collection from the datasource to the view model.
+
+The Agent mapping process, however, is expecting consistency when it comes to interface usage.  If an interface is directly referenced in a view model, then the interface must be referenced in or inherited by the interface being used to cast the component’s datasource.  Changing the interface in this manner is technically valid to avoid the proxy error, but then the component’s datasource interface no longer follows the template the interface is designed to be mapped to.  An example of what this update would look like for the *ILocationList* interface is shown below along with its inconsistent comparison to its original template. ::
+
+
+    using System.Collections.Generic;
+    using Common.Core.Models.Fields;
+    using Glass.Mapper.Sc.Configuration;
+    using Glass.Mapper.Sc.Configuration.Attributes;
+
+    namespace Ignition.Sc.Components.Location.Models
+    {
+        [SitecoreType(TemplateId = "{A601C4D5-1BF3-4167-9B44-975179E292D4}", AutoMap = true)]
+        public interface ILocationList : IHeading, ILocationListCountry
+        {
+            [SitecoreField(Setting = SitecoreFieldSettings.InferType)]
+            IEnumerable<ILocationListCountry> PrimaryCountryLink { get; set; }
+
+            [SitecoreField(Setting = SitecoreFieldSettings.InferType)]
+            IEnumerable<ILocationListCountry> SecondaryCountryLinks { get; set; }
+        }
+    }
+
+.. image:: images/LocationListtemplate.jpg
+    :scale: 45
+    :align: center
+
+So how do we ensure that the Location List interface structure consistently reflects the template structure of the Location List in Sitecore?  Create a partial view model to replace the interface reference of the same Sitecore item and replace that property reference on the component’s view model.
+
+The partial view model would define properties very similar to the ones defined for the interface.  In addition, there is also room to be creative if necessary through the partial view model to pass additional or customized data into the view representing the component.  For example, an added item reference property allows use of an edit frame in Sitecore’s Experience Editor within the component’s view. ::
+
+
+    using System.Collections.Generic;
+    using Ignition.Sc.Components.Location.Models;
+
+    namespace Ignition.Sc.Components.Location.ViewModels
+    {
+        public class LocationListCountryViewModel 
+        {
+            public string Heading { get; set; }
+            public IEnumerable<ILocationCity> Cities { get; set; }
+            public ILocationListCountry EditFrameItem { get; set; }
+        }
+    }
+
+Before the partial view can be used, it must be populated with the data from the interface which represents the item the agent’s view model is accessing.  A custom method was created which accepts the ILocationListCountry as a parameter and returns the partial view which is part of the component’s view model. ::
+
+    private LocationListCountryViewModel PopulateListCountryItem(ILocationListCountry iCountry)
+    {
+        return new LocationListCountryViewModel
+        {
+     	    Heading = iCountry.Heading,
+            Cities = iCountry.Cities,
+            EditFrameItem = iCountry
+        };
+    }
+
+Now the updated view model for this component looks like so… ::
+
+    using System.Linq;
+    using Common.Core;
+    using Common.Core.MVC;
+    using Common.Core.Utils;
+    using Perficient.Sc.Components.Location.Models;
+    using Ignition.Sc.Components.Location.ViewModels;
+
+    namespace Ignition.Sc.Components.Location.Agents
+    {
+        public class LocationLocationListAgent : Agent<LocationListViewModel>
+        {
+            public LocationLocationListAgent(IRepository repository, SitecoreData sitecoreData) : base(repository, sitecoreData)
+            {
+            }
+
+            public override void PopulateModel()
+            {
+                var datasource = Datasource as ILocationList;
+
+                if (datasource == null) return;
+
+                ViewModel.Heading = datasource;
+                ViewModel.EditFrameItem = Datasource as ILocationList;
+            
+                ViewModel.PrimaryCountryModel = PopulateListCountryItem(datasource.PrimaryCountryLink.FirstOrDefault());
+                ViewModel.SecondaryCountriesModel = datasource.SecondaryCountryLinks.Select(PopulateListCountryItem);
+            }
+
+            private LocationListCountryViewModel PopulateListCountryItem(ILocationListCountry iCountry)
+            {
+                return new LocationListCountryViewModel
+                {
+                    Heading = iCountry.Heading,
+                    Cities = iCountry.Cities,
+                    EditFrameItem = iCountry
+                };
+            }
+        }
+    }
+
+Once the partial view is populated, the dependency to the interface which represents the item collection (ILocationListCountry) can now be removed since that information is provided by the partial view model instead.  As a result, the interface ILocationList now reflects the Sitecore template properly without causing the iProxy error mentioned at the beginning of this blog.
+
+**Another Approach Not Involving Partial View Models**
+
+There is another way to address this issue without requiring a partial view and will be convered for completeness of this topic.  We are returning to the original ILocationList interface which began the discussion of this blog as shown below. ::
+
+    using System.Collections.Generic;
+    using Common.Core.Models.Fields;
+    using Glass.Mapper.Sc.Configuration;
+    using Glass.Mapper.Sc.Configuration.Attributes;
+
+    namespace Ignition.Sc.Components.Location.Models
+    {
+        [SitecoreType(TemplateId = "{A601C4D5-1BF3-4167-9B44-975179E292D4}", AutoMap = true)]
+        public interface ILocationList : IHeading
+        {
+            [SitecoreField(Setting = SitecoreFieldSettings.InferType)]
+            IEnumerable<ILocationListCountry> PrimaryCountryLink { get; set; }
+
+            [SitecoreField(Setting = SitecoreFieldSettings.InferType)]
+            IEnumerable<ILocationListCountry> SecondaryCountryLinks { get; set; }
+        }
+    }
+
+A partial view model was used to capture the data associated with the LocationListCountry Sitecore items where the view agent converted the ILocationListCountry items into LocationListCountry partial view models, therefore there was no need to have a direct connection to the PrimaryCountryLink and SecondaryCountryLinks properties and its fields in Sitecore.
+
+After some research, it became clear that a direct connection can be created between the Sitecore field items and the PrimaryCountryLink and SecondaryCountryLinks properties which are capturing that information in those Sitecore items.  To create that connection, the ILocationList interface needs to be updated by providing the Sitecore field IDs of the PrimaryCountryLink and SecondaryCountryLink fields from the Location List template.
+
+Where are these GUIDs coming from ?  Just in case it was not clear, an image of the Location List template structure is provided below.  The GUIDs would come from Sitecore field items which are created when the PrimaryCountryLink and SecondaryCountryLink fields was added when the Location List template was developed.
+
+.. image:: images/PrimaryCountryLink.jpg
+    :scale: 50
+    :align: center
+
+That would have prevented the need to create a partial view.  If performed this way, the updated ILocationList interface would be coded as so… ::
+
+    using System.Collections.Generic;
+    using Common.Core.Models.Fields;
+    using Glass.Mapper.Sc.Configuration;
+    using Glass.Mapper.Sc.Configuration.Attributes;
+
+    namespace Ignition.Sc.Components.Location.Models
+    {
+        [SitecoreType(TemplateId = "{A601C4D5-1BF3-4167-9B44-975179E292D4}", AutoMap = true)]
+        public interface ILocationList : IHeading
+        {
+            [SitecoreField(FieldId = "{ACDBFF45-FE2F-433B-ACB2-F77E4C06ADA3}", Setting = SitecoreFieldSettings.InferType)]
+            IEnumerable<ILocationListCountry> PrimaryCountryLink { get; set; }
+
+            [SitecoreField(FieldId = "{4D4EBD74-5EC8-4F5F-81F2-87FA10CE92ED}", Setting = SitecoreFieldSettings.InferType)] 
+            IEnumerable<ILocationListCountry> SecondaryCountryLinks { get; set; } 
+        }    
+    }
+
+Note the FieldId attribute above both the PrimaryCountryLink and SecondaryCountryLinks interface properties which contains the GUID of each field in the LocationList Sitecore template.  Now that there is a direction connection between the Sitecore elements and the code through their GUIDs, the proxy error which appeared previously should not happen and a partial view is no longer needed to get around the original issue.
+
 .. _Reusing-the-View-Model:
 
 Re-Using the ViewModel
