@@ -311,6 +311,31 @@ Using a ViewModel and Agent
 Explicit View Location
 """"""""""""""""""""""
 
+Passing a Query String using the Ignition Framework
+"""""""""""""""""""""""""""""""""""""""""""""""""""
+The process of taking advantage of the Ignition framework when it comes to building models is to pass data successfully to the view’s agent so it can use its PopulateModel method to transfer the data to view’s model or perform any other logic necessary to properly render the Sitecore component.
+
+Through MVC’s architecture, a query string can be passed as a parameter of the controller’s ActionResult call.  The key is to take that information and pass it to the agent parameter call so that the agent’s PopulateModel method would then have access to the data and perform logic against it.
+
+The query string object can be passed as a whole to the agent through the View method call or as part of a larger agent parameter object designed to pass that data among others to the view agent call.
+
+As an example, let’s take a look at the code below… ::
+
+    public ActionResult Filters(FilterQueryStringParameters querystringParameters)
+    {
+        return View<FiltersViewAgent, FiltersViewModel>(querystringParameters);
+    }
+
+In this example, the query string associated with the URL call which is accessible by this component is captured through the FilterQueryStringParameters class.  The object is then passed to the agent object (FiltersViewAgent) by passing it as a parameter to the View method.  An example of how the agent’s Populate method would access the query string information is shown below. ::
+
+    public override void PopulateModel()
+    {
+        var queryStringParameters = AgentParameters as FilterQueryStringParameters;
+    }
+
+In this example, the passed in View agent parameter is accessed using the AgentParameters object which now contains this data and is casted to the class used to create the object in the controller call (FilterQueryStringParameters in this case).  At this point, the rest of the agent’s code can focus on using this data to complete the behavior of the view.
+
+
 .. _Ignition-Root-Project:
 
 =====================
